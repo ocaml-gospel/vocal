@@ -18,6 +18,8 @@ all: $(WHY3GEN)
 	why3 ide -L . -L $(SRC) $*.mlw
 %.prove:
 	why3 prove -L . -L $(SRC) $*.mlw
+%.replay:
+	why3 replay -L . -L $(SRC) $*
 
 WHY3EXTRACT=why3 extract -D ocaml64 -D uf.drv\
 		--modular --recursive-deps #-D queue.drv
