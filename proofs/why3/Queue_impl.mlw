@@ -24,96 +24,217 @@ module Impl
   use SinglyLL_impl.Mem
   use option.Option
   use seq.Seq
+  use seq.FreeMonoid
   use import seq.Mem as T
   use import seq.Distinct as D
 
+  use mach.int.Int63
+
   type t 'a = {
-    mutable ghost length   : int;
+    mutable       len   : int63;
     mutable       first    : loc 'a;
     mutable       last     : loc 'a;
     mutable ghost view     : seq 'a;
     mutable ghost list     : seq (loc 'a);
     mutable ghost used_mem : mem 'a
-  } invariant { length > 0 -> first = list[0] /\ last = list[length - 1] /\
+  } invariant { len > 0 -> first = list[0] /\ last = list[len - 1] /\
                               used_mem.next last = Some null  }
-    invariant { length = 0 -> first = last = null }
-    invariant { length = Seq.length view = Seq.length list }
-    invariant { forall i. 0 <= i < length -> list[i] <> null }
+    invariant { len = 0 -> first = last = null }
+    invariant { len = Seq.length view = Seq.length list }
+    invariant { 0 <= len <= max_int63 }
+    invariant { forall i. 0 <= i < len -> list[i] <> null }
     invariant { D.distinct list }
     invariant { forall x: loc 'a. T.mem x list <-> used_mem.next x <> None }
-    invariant { forall i. 0 <= i < length - 1 ->
+    invariant { forall i. 0 <= i < len - 1 ->
                   used_mem.next list[i] = Some list[i+1] }
-    invariant { forall i. 0 <= i < length ->
+    invariant { forall i. 0 <= i < len ->
                   used_mem.contents list[i] = Some view[i] }
     by {
-      length = 0; first = null; last = null;
+      len = 0; first = null; last = null;
       view = empty; list = empty; used_mem = empty_memory ();
     }
 
   (* OCaml code starts here *)
 
+  exception Empty
+
   lemma mem_tail: forall x: 'a, s: seq 'a.
     Seq.length s > 0 ->
     mem x s <-> (x = s[0] \/ mem x s[1 .. ])
 
+  lemma length_empty_seq: forall s: seq 'a. s == empty <-> Seq.length s = 0
+
   let create () : t 'a
     ensures { result.view = empty }
     ensures { result.used_mem = empty_memory () }
-  = { length = 0; first = null; last = null;
+  = { len = 0; first = null; last = null;
       view = empty; list = empty; used_mem = empty_memory () }
+
+  let clear (q: t 'a) : unit
+    ensures { q.view == empty }
+  = q.first <- null;
+    q.last <- null;
+    q.len <- 0;
+    q.view <- Seq.empty;
+    q.list <- Seq.empty;
+    q.used_mem <- empty_memory ()
 
   let is_empty (q: t 'a) : bool
     ensures { result <-> q.view == empty }
   = q.first == null
 
-  let push (x: 'a) (q: t 'a) : unit
+  let length (q: t 'a) : int63
+    ensures { result = Seq.length q.view }
+  = q.len
+
+  let add (x: 'a) (q: t 'a) : unit
+    requires { len q < max_int63 }
     ensures { q.view == snoc (old q.view) x }
   = let c = mk_cell q.used_mem x null in
     if q.last == null then begin
       q.first <- c;
       q.last  <- c;
-      q.length <- 1;
+      q.len <- 1;
       q.view <- cons x Seq.empty;
       q.list <- cons c Seq.empty
     end else begin
       set_next q.used_mem q.last c;
       q.last <- c;
-      q.length <- q.length + 1;
+      q.len <- q.len + 1;
       q.view <- snoc q.view x;
       q.list <- snoc q.list c;
     end
 
-  (*TODO: Subspecification: we must ensure that the returned value is indeed the
-          first element of the queue *)
-  let pop (q: t 'a) : 'a
-    requires { Seq.length q.view > 0 }
-    ensures  { q.view == (old q.view)[1 .. ] }
-    ensures  { old q.view == cons result q.view }
-  = let x = get_content q.used_mem q.first in
-    if get_next q.used_mem q.first == null then begin
-      free q.used_mem q.first;
-      q.first <- null;
-      q.last <- null;
-      q.length <- 0;
-      q.view <- Seq.empty;
-      q.list <- Seq.empty
-    end else begin
-      let ghost oldfirst = q.first in
-      q.first <- get_next q.used_mem q.first;
-      q.length <- q.length - 1;
-      q.view  <- q.view[1 .. ];
-      q.list  <- q.list[1 .. ];
-      free q.used_mem oldfirst
-    end;
-    x
+  let push x q
+    requires { len q < max_int63 }
+    ensures { q.view == snoc (old q.view) x }
+  = add x q
+
+  let take_opt (q: t 'a) : option 'a
+    ensures { old q.view == empty -> result = None /\ q.view == old q.view }
+    ensures { not (old q.view == empty) -> result = Some (old q.view[0]) }
+    ensures { not (old q.view == empty) -> q.view = old q.view[1 ..] }
+  =
+    if q.first == null
+    then None
+    else
+      let next = get_next q.used_mem q.first in
+      let content = get_content q.used_mem q.first in
+      if next == null
+      then begin
+        clear q;
+        Some content
+      end else begin
+        let ghost oldfirst = q.first in
+        q.len <- q.len - 1;
+        q.first <- next;
+        q.view <- q.view[1 ..];
+        q.list <- q.list[1 ..];
+        free q.used_mem oldfirst;
+        Some content
+     end
+
+  let take (q: t 'a) : 'a
+    ensures { old q.view == cons result q.view }
+    raises  { Empty -> old q.view == empty }
+  =
+    if q.first == null
+    then raise Empty
+    else
+      let next = get_next q.used_mem q.first in
+      let content = get_content q.used_mem q.first in
+      if next == null
+      then begin
+        clear q;
+        content
+      end else begin
+        let ghost oldfirst = q.first in
+        q.len <- q.len - 1;
+        q.first <- next;
+        q.view <- q.view[1 ..];
+        q.list <- q.list[1 ..];
+        free q.used_mem oldfirst;
+        content
+     end
+
+  let pop q
+    ensures { old q.view == cons result q.view }
+    raises  { Empty -> old q.view == empty }
+  = take q
+
+  let peek (q: t 'a) : 'a
+    ensures { result = Seq.get q.view 0 }
+    raises  { Empty -> q.view == empty }
+  = if q.first == null
+    then raise Empty
+    else get_content q.used_mem q.first
+
+  let peek_opt (q: t 'a) : option 'a
+    ensures { q.view == empty -> result = None }
+    ensures { not q.view == empty -> result = Some q.view[0] }
+  = if q.first == null
+    then None
+    else Some (get_content q.used_mem q.first)
+
+  let top q
+    ensures { result = Seq.get q.view 0 }
+    raises  { Empty -> q.view == empty }
+  = peek q
+
+  let copy (q: t 'a) : t 'a
+    ensures { result.view == q.view }
+  =
+    let ref q_res = create () in
+    let ref cell = q.first in
+    let ghost ref i = 0 in
+    while (not (cell == null)) do
+      invariant { 0 <= i <= q.len }
+      invariant { i = q_res.len }
+      invariant { q_res.view = q.view[0..i] }
+      invariant { 0 <= i < q.len -> cell = q.list[i] }
+      invariant { i = q.len -> cell = null }
+      invariant { q_res.len > 0 -> q_res.first = q_res.list[0] /\
+                                q_res.last = q_res.list[q_res.len - 1] /\
+                                q_res.used_mem.next q_res.last = Some null  }
+      invariant { q_res.len = 0 -> q_res.first = q_res.last = null }
+      invariant { q_res.len = Seq.length q_res.view = Seq.length q_res.list }
+      invariant { forall i. 0 <= i < q_res.len -> q_res.list[i] <> null }
+      invariant { D.distinct q_res.list }
+      invariant { forall x: loc 'a.
+                  T.mem x q_res.list <-> q_res.used_mem.next x <> None }
+      invariant { forall i. 0 <= i < q_res.len - 1 ->
+                    q_res.used_mem.next q_res.list[i] = Some q_res.list[i+1] }
+      invariant { forall i. 0 <= i < q_res.len ->
+                    q_res.used_mem.contents q_res.list[i] = Some q_res.view[i] }
+      variant { q.len - i }
+      let contents = get_content q.used_mem cell in
+      push contents q_res;
+      snoc_dec q.view[0..i+1];
+      cell <- get_next q.used_mem cell;
+      i <- i+1;
+    done;
+    q_res
+
+  predicate disjoint_queue (q1 q2: t 'a) =
+    disjoint_mem q1.used_mem q2.used_mem
 
   let transfer (q1 q2: t 'a) : unit
     requires { disjoint_mem q1.used_mem q2.used_mem }
+    requires { len q1 + len q2 <= max_int63 }
     ensures  { q2.view == (old q2.view) ++ (old q1.view) }
     ensures  { q1.view == empty }
-  = if not (is_empty q1) then
+  = let lemma disjoint_mem_disjoint_list (q1 q2: t 'a)
+      requires { disjoint_queue q1 q2 }
+      ensures  { forall i. 0 <= i < Seq.length q1.list ->
+                   not (mem q1.list[i] q2.list) }
+    = assert { forall x. mem x q1.list -> not (mem x q2.list) } in
+    let lemma disjoint_append (q1 q2: t 'a)
+      requires { disjoint_queue q1 q2 }
+      ensures  { D.distinct (q2.list ++ q1.list) }
+    = () in
+    if not (is_empty q1) then
       if is_empty q2 then begin
-        q2.length, q1.length <- q1.length, 0;
+        q2.len, q1.len <- q1.len, 0;
         q2.first, q2.last <- q1.first, q1.last;
         q2.list <- q2.list ++ q1.list;
         q2.view <- q2.view ++ q1.view;
@@ -121,8 +242,8 @@ module Impl
         (* clear q1 is inlined, since type invariant for q1 is now broken *)
         q1.first, q1.last, q1.list, q1.view <- null, null, Seq.empty, Seq.empty;
       end else begin
-        let len = q2.length + q1.length in
-        q2.length, q1.length <- len, 0;
+        let len = q2.len + q1.len in
+        q2.len, q1.len <- len, 0;
         set_next q2.used_mem q2.last q1.first;
         q2.last, q2.list, q2.view <-
           q1.last, q2.list ++ q1.list, q2.view ++ q1.view;
@@ -132,6 +253,31 @@ module Impl
         q1.first, q1.last, q1.list, q1.view <- null, null, Seq.empty, Seq.empty
       end
 
+  use seq.FoldLeft
+
+  let rec fold (f: 'b -> 'a -> 'b) (start: 'b) (q: t 'a) : 'b
+    ensures { result = fold_left f start q.view }
+  = let rec aux (f: 'b -> 'a -> 'b) (acc: 'b) (cell: loc 'a) (ghost i: int) : 'b
+      requires { 0 <= i <= q.len }
+      requires { fold_left f start q.view = fold_left f acc q.view[i ..] }
+      requires { i < q.len -> cell = q.list[i] }
+      requires { i = q.len -> cell = null }
+      variant  { q.len - i }
+      ensures  { result = fold_left f start q.view }
+    =
+      if cell == null then acc
+      else
+        let x = get_content q.used_mem cell in
+        let next = get_next q.used_mem cell in
+        assert { fold_left f acc q.view[i ..]
+                 = fold_left f (f acc q.view[i]) q.view[i+1 ..] };
+        aux f (f acc x) next (i+1)
+    in
+    aux f start q.first 0
+
+  let iter (f: 'a -> unit) (q: t 'a) : unit
+  = fold (fun () x -> f x) () q
+
 end
 
 module Correct
@@ -139,7 +285,9 @@ module Correct
   use Impl
 
   clone Queue.Sig with
-    type t,
-    val  create, val is_empty, val push, val pop, val transfer
+    type t, exception Empty,
+    val create, val is_empty, val add, val push, val pop, val take_opt,
+    val take, val peek, val peek_opt, val top, val copy, val clear, val length,
+    val transfer, val fold, val iter
 
 end
