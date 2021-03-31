@@ -13,9 +13,9 @@
 (** Zippers for lists *)
 
 type 'a t
-(*@ model seq: 'a seq *)
-(*@ model idx: integer *)
-(*@ invariant 0 <= idx <= length seq *)
+(*@ model seq: 'a seq
+    model idx: integer
+    invariant 0 <= idx <= length seq *)
 
 val empty : unit -> 'a t
 (*@ z = empty ()

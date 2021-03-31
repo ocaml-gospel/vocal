@@ -14,12 +14,12 @@
 type 'a elem
 
 (*@ type 'a uf *)
-(*@ mutable model dom : 'a elem set *)
-(*@ mutable model rep : 'a elem -> 'a elem *)
-(*@ mutable model img : 'a elem -> 'a *)
-(*@ invariant forall x: 'a elem. mem x dom -> img x = img (rep x) *)
-(*@ invariant forall x: 'a elem. mem x dom -> rep (rep x) = rep x *)
-(*@ invariant forall x: 'a elem. mem x dom -> mem (rep x) dom *)
+(*@ mutable model dom : 'a elem set
+    mutable model rep : 'a elem -> 'a elem
+    mutable model img : 'a elem -> 'a
+    invariant forall x: 'a elem. mem x dom -> img x = img (rep x)
+    invariant forall x: 'a elem. mem x dom -> rep (rep x) = rep x
+    invariant forall x: 'a elem. mem x dom -> mem (rep x) dom *)
 
 (*@ predicate equiv (uf: 'a uf) (x: 'a elem) (y: 'a elem) =
       rep uf x = rep uf y *)
