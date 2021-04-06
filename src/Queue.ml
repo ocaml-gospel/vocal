@@ -97,7 +97,7 @@ let transfer : type a. (a t) -> (a t) ->  unit =
                      begin q1.first <- SinglyLL.Nil ;
                      q1.last <- SinglyLL.Nil  end end end
 
-let rec fold : type a b. (b -> (a -> b)) -> b -> (a t) ->  b =
+let fold : type a b. (b -> (a -> b)) -> b -> (a t) ->  b =
   fun f start q -> let rec aux (f1: b -> a -> b) (acc: b)
                                (cell: a SinglyLL.cell) : b =
                      if (cell == (SinglyLL.Nil ))
