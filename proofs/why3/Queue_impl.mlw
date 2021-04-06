@@ -255,7 +255,7 @@ module Impl
 
   use seq.FoldLeft
 
-  let rec fold (f: 'b -> 'a -> 'b) (start: 'b) (q: t 'a) : 'b
+  let fold (f: 'b -> 'a -> 'b) (start: 'b) (q: t 'a) : 'b
     ensures { result = fold_left f start q.view }
   = let rec aux (f: 'b -> 'a -> 'b) (acc: 'b) (cell: loc 'a) (ghost i: int) : 'b
       requires { 0 <= i <= q.len }
