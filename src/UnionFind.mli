@@ -12,7 +12,7 @@
 (*@ open Map *)
 
 type 'a elem
-
+  
 (*@ type 'a uf *)
 (*@ mutable model dom : 'a elem set
     mutable model rep : 'a elem -> 'a elem
@@ -108,15 +108,15 @@ val union : 'a elem -> 'a elem -> unit
 *)
 
 (*@ val join: 'a uf -> 'a uf -> unit *)
-(* @ join uf1 uf2
-      (*? requires disjoint (dom uf1) (dom uf2) *)
-      modifies uf1
-      destroys uf2
-      ensures  dom uf1 = old (dom uf1) `union` old (dom uf2)
-      ensures  forall x.
-        rep uf1 x = if mem x (old (dom uf1)) then old (rep uf1 x)
-                                             else old (rep uf2 x)
-      ensures  forall x.
-        img uf1 x = if mem x (old (dom uf1)) then old (img uf1 x)
+(*@ join uf1 uf2
+    (*? requires disjoint (dom uf1) (dom uf2) *)
+    modifies uf1
+    consumes uf2
+    ensures  dom uf1 = old (dom uf1) `union` old (dom uf2)
+    ensures  forall x.
+      rep uf1 x = if mem x (old (dom uf1)) then old (rep uf1 x)
+                                           else old (rep uf2 x)
+    ensures  forall x.
+      img uf1 x = if mem x (old (dom uf1)) then old (img uf1 x)
                                              else old (img uf2 x)
 *)

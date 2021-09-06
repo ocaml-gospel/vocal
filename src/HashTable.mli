@@ -31,11 +31,11 @@ module Make (K : HashedType) : sig
   type key = K.t
 
   type 'a table
-  (*@ ephemeral *)
-  (*@ mutable model dom : key set *)
-  (*@ invariant forall x y: key. Set.mem x dom -> Set.mem y dom -> K.equiv x y -> x = y *)
-  (*@ mutable model view: key -> 'a list *)
-  (*@ invariant forall k: key. not (Set.mem k dom) -> view k = [] *)
+  (*@ ephemeral
+      mutable model dom : key set
+      invariant forall x y: key. Set.mem x dom -> Set.mem y dom -> K.equiv x y -> x = y
+      mutable model view: key -> 'a list
+      invariant forall k: key. not (Set.mem k dom) -> view k = [] *)
 
   type 'a t = 'a table
 
@@ -117,7 +117,4 @@ module Make (K : HashedType) : sig
   val mem: 'a t -> key -> bool
   (*@ b = mem h k
     ensures b <-> view h k <> [] *)
-
-  val to_seq: 'a t -> (key * 'a) Seq.t
-
 end

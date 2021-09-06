@@ -11,9 +11,9 @@
 (*@ open Seq *)
 
 type 'a buffer
-(*@ mutable model sequence: 'a seq  *)
-(*@         model capacity: integer *)
-(*@ invariant length sequence <= capacity <= Sys.max_array_length *)
+(*@ mutable model sequence: 'a seq
+            model capacity: integer
+    invariant length sequence <= capacity <= Sys.max_array_length *)
 
 val create: int -> 'a -> 'a buffer
 (*@ b = create n dummy
