@@ -17,7 +17,7 @@ struct
   type heap = X.t Vector.t
   
   let create (_: unit) : heap =
-    Vector.create ?capacity:(Some 0) ~dummy:X.dummy
+    Vector.create ?capacity:(Some 0) X.dummy
   
   let is_empty (h: heap) : bool = Vector.is_empty h
   

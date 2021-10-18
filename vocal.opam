@@ -29,4 +29,10 @@ build: [
 depends: [
   "dune" {>= "2.4.0"}
   "ocaml" {>= "4.07"}
+  "gospel" {with-test}
 ]
+
+pin-depends: [
+  [ "gospel.dev" "git+https://github.com/ocaml-gospel/gospel#33db0e653e9e247c03839f4df18efa329d58e473" ]
+]
+

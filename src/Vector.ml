@@ -14,8 +14,8 @@ type 'a t = {
   mutable data: ('a array);
   }
 
-let create : type a. ?capacity:int -> dummy:a ->  (a t) =
-  fun ?capacity:capacity ~dummy:dummy -> let capacity1 =
+let create : type a. ?capacity:int -> a ->  (a t) =
+  fun ?capacity:capacity dummy -> let capacity1 =
                                            match capacity with
                                            | None -> 0 
                                            | Some c -> c in
