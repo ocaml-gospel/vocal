@@ -1,16 +1,6 @@
-(**************************************************************************)
-(*                                                                        *)
-(*  VOCaL -- A Verified OCaml Library                                     *)
-(*                                                                        *)
-(*  Copyright (c) 2020 The VOCaL Project                                  *)
-(*                                                                        *)
-(*  This software is free software, distributed under the MIT license     *)
-(*  (as described in file LICENSE enclosed).                              *)
-(**************************************************************************)
-
 type 'a content =
-  | Link of ('a content) ref
-  | Root of int * 'a
+  | Link of (('a content) ref)
+  | Root of (int) * 'a
 
 type 'a elem = ('a content) ref
 
@@ -61,5 +51,5 @@ let union_aux : type a. ((a content) ref) -> ((a content) ref) ->  unit =
   fun x y -> let a = find x in let b = find y in link a b
 
 let union : type a. ((a content) ref) -> ((a content) ref) ->  unit =
-  fun x y -> ignore (union_aux x y)
+  fun x y -> union_aux x y
 
